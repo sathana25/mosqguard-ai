@@ -5,6 +5,16 @@ Residents photograph stagnant water, AI checks the photo, the system ranks each 
 
 AI Hackathon 2026 · Slot II · Climate, Disease Prediction and Public Health · Sector 2 (MOSQGUARD AI).
 
+## Start here
+
+| I want to… | Do this |
+|---|---|
+| **Try the app now** | Open the demo link the team shares (or scan its QR code), then tap **Resident**, **Officer** or **Field worker** on the login page. Last link: `https://depend-relatives-musician-once.trycloudflare.com` (temporary; it changes each time the team restarts it). |
+| **Run it on my computer** | See [Quick start](#quick-start). Fastest: `docker compose up --build`, then open http://localhost:8000. |
+| **Share it as a public link** | See [DEMO.md](DEMO.md) (free Cloudflare HTTPS link). |
+| **Change a feature** | See [How to modify](#how-to-modify). Run `python -m pytest -q` in `backend` afterwards to check nothing broke. |
+| **Check the API** | http://localhost:8000/docs once it is running. |
+
 ---
 
 ## What it does
@@ -108,7 +118,8 @@ API documentation (interactive): http://localhost:8000/docs
 ## Use it on a phone
 
 - **Same Wi-Fi:** run `npm run dev`, then open `http://<your-computer-ip>:5173` on the phone.
-- **Install as an app:** phones only allow installing, camera and GPS on **HTTPS**. Deploy the Docker image to any host with HTTPS (Render, Railway, a VM with Caddy), or share your laptop with a tunnel such as `cloudflared tunnel --url http://localhost:8000`. Then open the link and choose **Add to Home screen**.
+- **Public link for judges:** see **[DEMO.md](DEMO.md)**. It shares your laptop through a free Cloudflare HTTPS link, with a checklist and fixes for common problems.
+- **Install as an app:** phones only allow installing, camera and GPS on **HTTPS** (the Cloudflare link works). Open the link and choose **Add to Home screen**.
 
 ---
 
