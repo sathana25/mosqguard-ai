@@ -92,6 +92,19 @@ def test_officer_dashboards(client, officer):
     assert "by_status" in client.get("/api/analytics", headers=officer).json()
 
 
+def test_heuristic_flags_puddle_not_flat_surface(tmp_path):
+    from app.services.detector import HeuristicDetector
+
+    puddle = tmp_path / "puddle.jpg"
+    puddle.write_bytes(puddle_jpeg())
+    flat = tmp_path / "flat.jpg"
+    Image.new("RGB", (400, 300), (70, 70, 72)).save(flat)  # plain dark road / wall
+
+    assert HeuristicDetector().detect(puddle)["suspected"] is True
+    r = HeuristicDetector().detect(flat)
+    assert r["suspected"] is False and r["confidence"] == 0
+
+
 def test_risk_rises_with_rain_and_reports():
     dry = Ward(name="Dry", rain_7d_mm=0, dengue_cases_30d=0)
     wet = Ward(name="Wet", rain_7d_mm=170, dengue_cases_30d=6)

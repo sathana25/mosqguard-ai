@@ -36,6 +36,8 @@ COCO_CONTAINERS = {
     "sink": "sink / basin",
     "toilet": "toilet / tank",
 }
+# People and vehicles: if they fill the photo, it is not a close-up of a breeding site
+SCENE_CLASSES = {"person", "car", "bus", "truck", "motorcycle", "bicycle", "train"}
 # Custom model classes that mean "breeding site"
 CUSTOM_RISK_CLASSES = {"stagnant_water", "container", "tyre", "tire", "drain", "larvae", "tank", "pot"}
 
@@ -61,32 +63,63 @@ def _result(objects, water, larvae, engine, base_conf=None):
     }
 
 
+def _largest_blob(mask: np.ndarray) -> int:
+    """Size of the largest 4-connected region in a small boolean mask."""
+    seen = np.zeros_like(mask, dtype=bool)
+    rows, cols = mask.shape
+    best = 0
+    for r0 in range(rows):
+        for c0 in range(cols):
+            if not mask[r0, c0] or seen[r0, c0]:
+                continue
+            stack, size = [(r0, c0)], 0
+            seen[r0, c0] = True
+            while stack:
+                r, c = stack.pop()
+                size += 1
+                for rr, cc in ((r + 1, c), (r - 1, c), (r, c + 1), (r, c - 1)):
+                    if 0 <= rr < rows and 0 <= cc < cols and mask[rr, cc] and not seen[rr, cc]:
+                        seen[rr, cc] = True
+                        stack.append((rr, cc))
+            best = max(best, size)
+    return best
+
+
 class HeuristicDetector:
-    """Rule-based fallback using colour and texture. No ML packages needed."""
+    """Rule-based fallback using colour and texture. No ML packages needed.
+
+    Looks for ONE large, very smooth patch with water-like colour. Scattered
+    dark pixels (clothes, shadows, hair) do not count. Confidence is capped
+    low because a heuristic cannot tell a puddle from wet asphalt reliably.
+    """
 
     name = "Basic image heuristic"
+    MIN_BLOB = 0.12     # largest water-like patch must cover 12% of the photo
+    MAX_BLOB = 0.85     # ...but not the whole photo: a puddle has ground around it
+    MAX_CONF = 0.6
 
     def detect(self, path: str | Path) -> dict:
-        img = Image.open(path).convert("RGB")
-        img.thumbnail((256, 256))
+        img = Image.open(path).convert("RGB").resize((256, 192))
         rgb = np.asarray(img, dtype=np.float32) / 255.0
         hsv = np.asarray(img.convert("HSV"), dtype=np.float32) / 255.0
         h, s, v = hsv[..., 0], hsv[..., 1], hsv[..., 2]
 
-        # Local texture: standing water is smooth compared with soil, grass or walls
+        # Standing water is very smooth compared with soil, grass, walls or people
         gray = rgb.mean(axis=2)
         gy, gx = np.gradient(gray)
-        smooth = np.hypot(gx, gy) < 0.035
+        smooth = np.hypot(gx, gy) < 0.02
 
-        # Water tends to be dark/murky (low value) or bluish/greenish reflective
-        murky = (v < 0.45) & (s < 0.55)
+        # Murky (dark, dull) or reflective blue/green water
+        murky = (v > 0.12) & (v < 0.42) & (s < 0.4)
         bluish = (h > 0.45) & (h < 0.7) & (s > 0.15) & (v > 0.25)
-        greenish = (h > 0.18) & (h < 0.45) & (s > 0.2) & (v < 0.55)
-        water_mask = smooth & (murky | bluish | greenish)
-        ratio = float(water_mask.mean())
+        greenish = (h > 0.18) & (h < 0.45) & (s > 0.2) & (v < 0.5)
+        fine = smooth & (murky | bluish | greenish)
+        # 4x4 blocks: a block counts as water when most of its pixels do
+        mask = fine.reshape(48, 4, 64, 4).mean(axis=(1, 3)) > 0.6
 
-        water = ratio > 0.12
-        conf = min(0.85, 0.25 + ratio * 1.6) if water else ratio
+        ratio = _largest_blob(mask) / mask.size
+        water = self.MIN_BLOB < ratio < self.MAX_BLOB
+        conf = min(self.MAX_CONF, 0.3 + ratio * 0.6) if water else 0.0
         objects = [{"label": "possible standing water", "confidence": round(conf, 3), "box": None}] if water else []
         return _result(objects, water, False, self.name, conf)
 
@@ -103,10 +136,14 @@ class YoloDetector:
         res = self.model.predict(str(path), conf=0.25, verbose=False)[0]
         names = res.names
         objects, water, larvae = [], False, False
+        img_area = float(res.orig_shape[0] * res.orig_shape[1])
+        scene_area = 0.0  # area covered by people and vehicles
         for box in res.boxes:
             cls = names[int(box.cls)]
             conf = float(box.conf)
             xyxy = [round(float(x), 1) for x in box.xyxy[0].tolist()]
+            if cls in SCENE_CLASSES:
+                scene_area += (xyxy[2] - xyxy[0]) * (xyxy[3] - xyxy[1])
             if self.custom:
                 key = cls.lower().replace(" ", "_")
                 if key not in CUSTOM_RISK_CLASSES:
@@ -120,8 +157,9 @@ class YoloDetector:
                 label = COCO_CONTAINERS[cls]
             objects.append({"label": label, "confidence": round(conf, 3), "box": xyxy})
 
-        if not self.custom:
-            # COCO cannot see water itself, so add the heuristic's water check
+        if not self.custom and scene_area / img_area < 0.15:
+            # COCO cannot see water itself, so add the heuristic's water check,
+            # but not on photos of people or traffic (dark clothes and roads fool it)
             h = HeuristicDetector().detect(path)
             water = h["water_visible"]
             if water and not objects:
