@@ -1,0 +1,20 @@
+services:
+  app:
+    build:
+      context: .
+      args:
+        # Set to "false" for a fast build without YOLOv8 (uses the basic heuristic detector)
+        INSTALL_ML: "true"
+    ports:
+      - "8000:8000"
+    environment:
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
+      OPENWEATHER_API_KEY: ${OPENWEATHER_API_KEY:-}
+      MAP_LAT: ${MAP_LAT:-11.0168}
+      MAP_LON: ${MAP_LON:-76.9558}
+    volumes:
+      - mosqguard-data:/data
+    restart: unless-stopped
+
+volumes:
+  mosqguard-data:

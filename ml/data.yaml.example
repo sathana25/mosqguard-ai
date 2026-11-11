@@ -1,0 +1,14 @@
+# YOLOv8 dataset config. Copy to data.yaml and edit the paths.
+path: ./datasets/mosqguard   # dataset root
+train: images/train
+val: images/val
+test: images/test
+
+# Class names. The backend treats all of these as breeding-site signals
+# (see CUSTOM_RISK_CLASSES in backend/app/services/detector.py).
+names:
+  0: stagnant_water
+  1: container
+  2: tyre
+  3: drain
+  4: larvae

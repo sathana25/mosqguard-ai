@@ -1,0 +1,5 @@
+# Optional: real YOLOv8 detection. Without these the app uses the basic heuristic detector.
+# CPU-only PyTorch keeps the install small:
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+#   pip install -r requirements-ml.txt
+ultralytics==8.3.40

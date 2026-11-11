@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+
+# App data
+backend/mosqguard.db
+backend/uploads/
+*.db
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# ML
+ml/datasets/
+ml/runs/
+ml/data.yaml
+*.pt
+!ml/weights/.gitkeep
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+.env
